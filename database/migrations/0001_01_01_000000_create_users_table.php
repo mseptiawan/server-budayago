@@ -16,7 +16,6 @@ return new class extends Migration
             $table->id();
             // $table->string('name'); // Diganti menjadi fullname
             $table->string('fullname'); 
-            $table->string('username')->unique(); // Ditambahkan: untuk edit username
             $table->string('email')->unique();
             $table->string('role')->default('user'); // Ditambahkan: 'admin' atau 'user'
             $table->timestamp('email_verified_at')->nullable();
