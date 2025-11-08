@@ -2,37 +2,47 @@
 
 namespace App\Services;
 
-use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Http;
 
 class GeminiService
 {
-    protected $client;
-    protected $apiKey;
+    protected string $apiKey;
 
     public function __construct()
     {
-        $this->apiKey = env('GEMINI_API_KEY');
-        $this->client = new Client([
-            'base_uri' => 'https://generativelanguage.googleapis.com/v1beta/',
-            'timeout'  => 30.0,
-        ]);
+        $this->apiKey = env('GEMINI_API_KEY'); // pastikan di .env ada GEMINI_API_KEY
     }
 
+    /**
+     * Kirim pertanyaan ke Gemini AI dan ambil jawaban.
+     */
     public function askGemini(string $prompt): string
     {
-        $model = 'gemini-1.5-flash'; // atau gemini-pro
-        $url = "models/{$model}:generateContent?key={$this->apiKey}";
+        $url = 'https://generativelanguage.googleapis.com/v1beta2/models/gemini-1.5:generateMessage';
 
-        $response = $this->client->post($url, [
-            'json' => [
-                'contents' => [
-                    ['parts' => [['text' => $prompt]]]
-                ],
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'Content-Type' => 'application/json',
+        ])->post($url, [
+            'prompt' => [
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => $prompt,
+                    ]
+                ]
             ],
+            'temperature' => 0.7,
+            'candidate_count' => 1
         ]);
 
-        $data = json_decode($response->getBody(), true);
+        if ($response->failed()) {
+            return "Maaf, terjadi kesalahan saat menghubungi Gemini AI: " . $response->body();
+        }
 
-        return $data['candidates'][0]['content']['parts'][0]['text'] ?? 'Tidak ada respon dari Gemini.';
+        $data = $response->json();
+
+        // Ambil jawaban dari response Gemini
+        return $data['candidates'][0]['content'] ?? 'Tidak ada jawaban dari Gemini.';
     }
 }

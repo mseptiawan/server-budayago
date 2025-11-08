@@ -7,3 +7,8 @@ Route::get('/', function () {
         'message' => 'Server BudayaGo API is running!'
     ]);
 });
+
+Route::get('/cek', function () {
+    return 'web ok';
+});
+

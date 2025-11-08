@@ -1,13 +1,21 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Services\GeminiService;
 
 class ChatbotController extends Controller
 {
-    public function chat(Request $request, GeminiService $gemini)
+    protected GeminiService $gemini;
+
+    public function __construct(GeminiService $gemini)
+    {
+        $this->gemini = $gemini;
+    }
+
+    public function chat(Request $request)
     {
         $request->validate([
             'message' => 'required|string|max:1000',
@@ -15,10 +23,9 @@ class ChatbotController extends Controller
 
         $userMessage = $request->input('message');
 
-        // Kamu bisa tambahkan konteks agar Gemini tahu topiknya
         $prompt = "Kamu adalah asisten budaya Indonesia. Jawab pertanyaan berikut secara informatif dan akurat:\n\n" . $userMessage;
 
-        $answer = $gemini->askGemini($prompt);
+        $answer = $this->gemini->askGemini($prompt);
 
         return response()->json([
             'question' => $userMessage,
