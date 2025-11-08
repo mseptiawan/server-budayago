@@ -11,16 +11,21 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Penyesuaian Tabel Users
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            // $table->string('name'); // Diganti menjadi fullname
+            $table->string('fullname'); 
+            $table->string('username')->unique(); // Ditambahkan: untuk edit username
             $table->string('email')->unique();
+            $table->string('role')->default('user'); // Ditambahkan: 'admin' atau 'user'
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
         });
 
+        // Tabel standari Laravel untuk Reset Password & Session
         Schema::create('password_reset_tokens', function (Blueprint $table) {
             $table->string('email')->primary();
             $table->string('token');
