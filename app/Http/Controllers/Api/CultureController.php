@@ -48,32 +48,45 @@ class CultureController extends Controller
     /**
      * Menyimpan Budaya baru (Hanya Admin).
      */
-    public function store(Request $request)
-    {
-        // Menggunakan array untuk validasi kategori
-        $categoryRules = 'required|string|in:' . implode(',', $this->allowedCategories);
+  public function store(Request $request)
+{
+    $categoryRules = 'required|string|in:' . implode(',', $this->allowedCategories);
 
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'category' => $categoryRules,
-            'province' => 'required|string|max:100',
-            'city_or_regency' => 'required|string|max:100',
-            'short_description' => 'required|string|max:500',
-            'long_description' => 'required|string',
-            'image_url' => 'required|url|max:255', // Asumsi URL (untuk storage terpisah)
-            'video_url' => 'nullable|url|max:255',
-            'virtual_tour_url' => 'nullable|url|max:255',
-        ]);
+    $validated = $request->validate([
+        'title' => 'required|string|max:255',
+        'category' => $categoryRules,
+        'province' => 'required|string|max:100',
+        'city_or_regency' => 'required|string|max:100',
+        'short_description' => 'required|string|max:500',
+        'long_description' => 'required|string',
+        'image_file' => 'required|file|mimes:jpg,jpeg,png,gif|max:2048',
+        'video_file' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
+        'virtual_tour_file' => 'nullable|file|mimes:jpg,jpeg,png,gif,mp4|max:10240',
+    ]);
 
-        // Tambahkan ID Admin yang memposting
-        $validated['user_id'] = Auth::id();
-
-        $culture = Culture::create($validated);
-        return response()->json([
-            'message' => 'Budaya berhasil ditambahkan.',
-            'data' => $culture
-        ], 201);
+    // Upload file jika ada
+    if ($request->hasFile('image_file')) {
+        $validated['image_url'] = $request->file('image_file')->store('cultures/images', 'public');
     }
+
+    if ($request->hasFile('video_file')) {
+        $validated['video_url'] = $request->file('video_file')->store('cultures/videos', 'public');
+    }
+
+    if ($request->hasFile('virtual_tour_file')) {
+        $validated['virtual_tour_url'] = $request->file('virtual_tour_file')->store('cultures/virtual', 'public');
+    }
+
+    $validated['user_id'] = Auth::id();
+
+    $culture = Culture::create($validated);
+
+    return response()->json([
+        'message' => 'Budaya berhasil ditambahkan.',
+        'data' => $culture
+    ], 201);
+}
+
 
     /**
      * Menampilkan detail Budaya lengkap.
@@ -94,36 +107,49 @@ class CultureController extends Controller
     /**
      * Memperbarui Budaya yang ada (Hanya Admin).
      */
-    public function update(Request $request, $id)
-    {
-        $culture = Culture::findOrFail($id);
-        
-        // Memastikan hanya admin yang bisa melakukan update (sudah ada di constructor, tapi untuk keamanan)
-        if (Auth::user()->role !== 'admin') {
-             return response()->json(['message' => 'Akses ditolak.'], 403);
-        }
+   public function update(Request $request, $id)
+{
+    $culture = Culture::findOrFail($id);
 
-        // Menggunakan array untuk validasi kategori
-        $categoryRules = 'required|string|in:' . implode(',', $this->allowedCategories);
-        
-        $validated = $request->validate([
-            'title' => 'sometimes|required|string|max:255',
-            'category' => 'sometimes|' . $categoryRules,
-            'province' => 'sometimes|required|string|max:100',
-            'city_or_regency' => 'sometimes|required|string|max:100',
-            'short_description' => 'sometimes|required|string|max:500',
-            'long_description' => 'sometimes|required|string',
-            'image_url' => 'sometimes|required|url|max:255',
-            'video_url' => 'nullable|url|max:255',
-            'virtual_tour_url' => 'nullable|url|max:255',
-        ]);
-
-        $culture->update($validated);
-        return response()->json([
-            'message' => 'Budaya berhasil diperbarui.',
-            'data' => $culture
-        ]);
+    if (Auth::user()->role !== 'admin') {
+         return response()->json(['message' => 'Akses ditolak.'], 403);
     }
+
+    $categoryRules = 'required|string|in:' . implode(',', $this->allowedCategories);
+
+    $validated = $request->validate([
+        'title' => 'sometimes|required|string|max:255',
+        'category' => 'sometimes|' . $categoryRules,
+        'province' => 'sometimes|required|string|max:100',
+        'city_or_regency' => 'sometimes|required|string|max:100',
+        'short_description' => 'sometimes|required|string|max:500',
+        'long_description' => 'sometimes|required|string',
+        'image_file' => 'sometimes|file|mimes:jpg,jpeg,png,gif|max:2048',
+        'video_file' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
+        'virtual_tour_file' => 'nullable|file|mimes:jpg,jpeg,png,gif,mp4|max:10240',
+    ]);
+
+    // Upload file jika ada
+    if ($request->hasFile('image_file')) {
+        $validated['image_url'] = $request->file('image_file')->store('cultures/images', 'public');
+    }
+
+    if ($request->hasFile('video_file')) {
+        $validated['video_url'] = $request->file('video_file')->store('cultures/videos', 'public');
+    }
+
+    if ($request->hasFile('virtual_tour_file')) {
+        $validated['virtual_tour_url'] = $request->file('virtual_tour_file')->store('cultures/virtual', 'public');
+    }
+
+    $culture->update($validated);
+
+    return response()->json([
+        'message' => 'Budaya berhasil diperbarui.',
+        'data' => $culture
+    ]);
+}
+
 
     /**
      * Menghapus Budaya (Hanya Admin).
