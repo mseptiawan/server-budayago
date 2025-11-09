@@ -28,12 +28,15 @@ protected function fullMediaUrl($path)
  */
 public function index(Request $request)
 {
+    // Inisialisasi query dasar
     $query = Culture::with('user');
 
+    // Filter berdasarkan Kategori
     if ($request->has('category') && $request->category !== 'all') {
         $query->where('category', $request->category);
     }
 
+    // Filter berdasarkan Provinsi (Untuk fitur Peta)
     if ($request->has('province') && $request->province !== 'all') {
         $query->where('province', $request->province);
     }
@@ -46,9 +49,15 @@ public function index(Request $request)
             'province' => $culture->province,
             'city_or_regency' => $culture->city_or_regency,
             'short_description' => $culture->short_description,
-            'image_url' => $this->fullMediaUrl($culture->image_url),
-            'video_url' => $this->fullMediaUrl($culture->video_url),
-            'virtual_tour_url' => $this->fullMediaUrl($culture->virtual_tour_url),
+            
+            // --- PENYESUAIAN PENTING DI SINI ---
+            // Gunakan FIELD DB ('..._file') sebagai input untuk helper:
+            'image_url' => $this->fullMediaUrl($culture->image_file),       // Mengambil dari kolom image_file
+            'video_url' => $this->fullMediaUrl($culture->video_file),       // Mengambil dari kolom video_file
+            'virtual_tour_url' => $this->fullMediaUrl($culture->virtual_tour_file), // Mengambil dari kolom virtual_tour_file
+            
+            // --- AKHIR PENYESUAIAN ---
+            
             'created_at' => $culture->created_at,
         ];
     });
@@ -59,21 +68,36 @@ public function index(Request $request)
 /**
  * Menampilkan detail Budaya
  */
+/**
+ * Menampilkan detail Budaya
+ */
 public function show($id)
 {
+    // Cari budaya beserta relasi user dan favorites
     $culture = Culture::with(['user', 'favorites'])->findOrFail($id);
 
-    $culture->image_url = $this->fullMediaUrl($culture->image_url);
-    $culture->video_url = $this->fullMediaUrl($culture->video_url);
-    $culture->virtual_tour_url = $this->fullMediaUrl($culture->virtual_tour_url);
+    // --- PENYESUAIAN PENTING DI SINI ---
+    // 1. Menggunakan FIELD DB ('..._file') untuk mengambil path.
+    // 2. Menimpa properti sementara ('..._url') di objek $culture untuk respons JSON.
+    
+    // Konversi path file (dari kolom DB: ..._file) menjadi full URL
+    $culture->image_url = $this->fullMediaUrl($culture->image_file);
+    $culture->video_url = $this->fullMediaUrl($culture->video_file);
+    $culture->virtual_tour_url = $this->fullMediaUrl($culture->virtual_tour_file);
+    
+    // --- AKHIR PENYESUAIAN ---
 
+    // Menentukan apakah user saat ini sudah memfavoritkan (untuk tampilan di frontend)
     $culture->is_favorited = Auth::check()
         ? $culture->favorites()->where('user_id', Auth::id())->exists()
         : false;
 
+    // Mengembalikan objek budaya (dengan is_favorited dan URL media lengkap)
     return response()->json($culture);
 }
-
+/**
+ * Menambahkan Budaya baru (Admin)
+ */
 /**
  * Menambahkan Budaya baru (Admin)
  */
@@ -97,23 +121,29 @@ public function store(Request $request)
         'virtual_tour_file' => 'nullable|file|mimes:jpg,jpeg,png,gif,mp4|max:20480', // 20 MB
     ]);
 
-    // Upload file
-   $validated['image_file'] = $request->file('image_file')->store('cultures/images', 'public');
+    // UPLOAD FILE DAN GANTI NILAI KEY DENGAN STRING PATH
+    $validated['image_file'] = $request->file('image_file')->store('cultures/images', 'public');
 
-if ($request->hasFile('video_file')) {
-    $validated['video_file'] = $request->file('video_file')->store('cultures/videos', 'public');
-}
+    if ($request->hasFile('video_file')) {
+        $validated['video_file'] = $request->file('video_file')->store('cultures/videos', 'public');
+    } else {
+        // Hapus key jika tidak ada file video yang di-upload
+        unset($validated['video_file']); 
+    }
 
-if ($request->hasFile('virtual_tour_file')) {
-    $validated['virtual_tour_file'] = $request->file('virtual_tour_file')->store('cultures/virtual', 'public');
-}
+    if ($request->hasFile('virtual_tour_file')) {
+        $validated['virtual_tour_file'] = $request->file('virtual_tour_file')->store('cultures/virtual', 'public');
+    } else {
+        // Hapus key jika tidak ada file virtual tour yang di-upload
+        unset($validated['virtual_tour_file']); 
+    }
 
     $validated['user_id'] = Auth::id();
 
     $culture = Culture::create($validated);
 
     // Kembalikan URL lengkap untuk frontend
-      $culture->image_url = $this->fullMediaUrl($culture->image_file);
+    $culture->image_url = $this->fullMediaUrl($culture->image_file);
     $culture->video_url = $this->fullMediaUrl($culture->video_file);
     $culture->virtual_tour_url = $this->fullMediaUrl($culture->virtual_tour_file);
 
@@ -123,6 +153,9 @@ if ($request->hasFile('virtual_tour_file')) {
     ], 201);
 }
 
+/**
+ * Update Budaya (Admin)
+ */
 /**
  * Update Budaya (Admin)
  */
@@ -137,7 +170,7 @@ public function update(Request $request, $id)
 
     $categoryRules = 'string|in:' . implode(',', $this->allowedCategories);
 
-    // Validasi input, semua optional (nullable)
+    // Validasi input menggunakan 'sometimes'
     $validated = $request->validate([
         'title' => 'sometimes|required|string|max:255',
         'category' => 'sometimes|' . $categoryRules,
@@ -150,17 +183,24 @@ public function update(Request $request, $id)
         'virtual_tour_file' => 'sometimes|file|mimes:jpg,jpeg,png,gif,mp4|max:20480',
     ]);
 
-    // Upload file jika ada
+    // UPLOAD DAN REPLACE KEY DENGAN STRING PATH
     if ($request->hasFile('image_file')) {
         $validated['image_file'] = $request->file('image_file')->store('cultures/images', 'public');
+    } else {
+        // HAPUS KEY jika file tidak di-upload. Ini penting agar path lama tetap ada.
+        unset($validated['image_file']);
     }
 
     if ($request->hasFile('video_file')) {
         $validated['video_file'] = $request->file('video_file')->store('cultures/videos', 'public');
+    } else {
+        unset($validated['video_file']);
     }
 
     if ($request->hasFile('virtual_tour_file')) {
         $validated['virtual_tour_file'] = $request->file('virtual_tour_file')->store('cultures/virtual', 'public');
+    } else {
+        unset($validated['virtual_tour_file']);
     }
 
     // Update database hanya field yang ada di $validated
@@ -176,7 +216,6 @@ public function update(Request $request, $id)
         'data' => $culture
     ]);
 }
-
 // public function update(Request $request, $id)
 // {
 //     // Debug cepat: cek apa yang dikirim
