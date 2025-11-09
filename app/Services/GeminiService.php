@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class GeminiService
 {
@@ -10,7 +11,12 @@ class GeminiService
 
     public function __construct()
     {
-        $this->apiKey = env('GEMINI_API_KEY'); // pastikan di .env ada GEMINI_API_KEY
+        $this->apiKey = env('GEMINI_API_KEY'); 
+        
+        // Cek jika API Key kosong (untuk menghindari error sebelum request)
+        if (empty($this->apiKey)) {
+            throw new \Exception("GEMINI_API_KEY is not set in the environment.");
+        }
     }
 
     /**
@@ -18,31 +24,48 @@ class GeminiService
      */
     public function askGemini(string $prompt): string
     {
-        $url = 'https://generativelanguage.googleapis.com/v1beta2/models/gemini-1.5:generateMessage';
+        // Gunakan v1beta untuk generateContent
+        $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey,
-            'Content-Type' => 'application/json',
-        ])->post($url, [
-            'prompt' => [
-                'messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => $prompt,
+        // Kirim request TANPA header Authorization. API Key harus di URL.
+        $response = Http::post($url . '?key=' . $this->apiKey, [
+            'contents' => [
+                [
+                    'role' => 'user',
+                    'parts' => [
+                        ['text' => $prompt]
                     ]
                 ]
             ],
-            'temperature' => 0.7,
-            'candidate_count' => 1
+            // PERBAIKAN: Pindahkan konfigurasi ke 'generationConfig'
+            'generationConfig' => [ 
+                'temperature' => 0.7,
+                'candidate_count' => 1
+                // Anda juga bisa menambahkan 'maxOutputTokens' di sini jika perlu
+            ]
         ]);
 
         if ($response->failed()) {
-            return "Maaf, terjadi kesalahan saat menghubungi Gemini AI: " . $response->body();
+            Log::error('Gemini API error', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            // Berikan detail body error jika status bukan 401/400
+            return "Maaf, terjadi kesalahan saat menghubungi Gemini AI: " . $response->status();
         }
 
         $data = $response->json();
 
-        // Ambil jawaban dari response Gemini
-        return $data['candidates'][0]['content'] ?? 'Tidak ada jawaban dari Gemini.';
+        // Cek jika ada 'candidates' dan 'parts' sebelum mengambil teks
+        if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+            return $data['candidates'][0]['content']['parts'][0]['text'];
+        }
+
+        // Jika tidak ada kandidat, mungkin diblokir (prompt safety)
+        if (isset($data['promptFeedback']['safetyRatings'])) {
+             return "Maaf, pertanyaan Anda melanggar kebijakan keamanan AI.";
+        }
+
+        return 'Tidak ada jawaban spesifik dari Gemini.';
     }
 }

@@ -3,7 +3,8 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CultureController;
 use App\Http\Controllers\Api\FavoriteController; // Pastikan controller ini di-import
-use App\Http\Controllers\Api\ChatbotController; 
+use App\Http\Controllers\Api\ChatbotController;
+use App\Http\Controllers\Api\GeminiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,7 +29,8 @@ Route::get('/test', function () {
     return response()->json(['ok' => true, 'message' => 'API is running']);
 });
 
-
+// Route::get('/chat/{query}', [GeminiController::class, 'chat']);
+// Route::get('/oauth2callback', [OAuthController::class, 'handleCallback']);
 /*
 |--------------------------------------------------------------------------
 | 2. PROTECTED ROUTES (Membutuhkan Token Sanctum - User dan Admin)
