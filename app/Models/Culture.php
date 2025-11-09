@@ -18,9 +18,9 @@ class Culture extends Model
         'city_or_regency',
         'short_description',
         'long_description',
-        'image_url',
-        'video_url',
-        'virtual_tour_url',
+        'image_file',
+        'video_file',
+        'virtual_tour_file',
         'user_id',
     ];
 

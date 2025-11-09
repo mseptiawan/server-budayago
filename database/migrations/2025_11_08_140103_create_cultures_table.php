@@ -27,9 +27,9 @@ return new class extends Migration
             $table->longText('long_description'); // Untuk Detail Budaya & Fitur Voice
 
             // Media
-            $table->string('image_url')->nullable(); 
-            $table->string('video_url')->nullable();
-            $table->string('virtual_tour_url')->nullable(); // Untuk 360 (null jika tidak ada)
+            $table->string('image_file')->nullable(); 
+            $table->string('video_file')->nullable();
+            $table->string('virtual_tour_file')->nullable(); // Untuk 360 (null jika tidak ada)
 
             // Relasi Admin yang memposting (Wajib diisi jika fitur admin sudah diterapkan)
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade'); 

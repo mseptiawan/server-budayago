@@ -6,50 +6,83 @@ use App\Http\Controllers\Controller;
 use App\Models\Culture;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class CultureController extends Controller
 {
-    // Kategori yang diizinkan sesuai rencana
-    protected $allowedCategories = [
-        'Tarian', 'Kuliner', 'Busana Adat', 'Kriya', 
-        'Upacara Adat', 'Arsitektur', 'Seni Tradisional'
-    ];
+protected $allowedCategories = [
+    'Tarian', 'Kuliner', 'Busana Adat', 'Kriya',
+    'Upacara Adat', 'Arsitektur', 'Seni Tradisional'
+];
 
-  
-    /**
-     * Menampilkan daftar semua Budaya (List Budaya).
-     * Dapat digunakan oleh semua User.
-     */
-    public function index(Request $request)
-    {
-        // Inisialisasi query dasar
-        $query = Culture::with('user'); // Load relasi dengan User (Admin)
+/**
+ * Helper untuk generate URL lengkap dari file storage
+ */
+protected function fullMediaUrl($path)
+{
+    return $path ? Storage::disk('public')->url($path) : null;
+}
 
-        // Logika Filtering:
-        // Filter berdasarkan Kategori
-        if ($request->has('category') && $request->category !== 'all') {
-            $query->where('category', $request->category);
-        }
+/**
+ * Menampilkan daftar semua Budaya
+ */
+public function index(Request $request)
+{
+    $query = Culture::with('user');
 
-        // Filter berdasarkan Provinsi
-        if ($request->has('province') && $request->province !== 'all') {
-            $query->where('province', $request->province);
-        }
-
-        // Ambil data untuk List Budaya (deskripsi singkat)
-        $cultures = $query->select([
-            'id', 'title', 'category', 'province', 'city_or_regency', 
-            'short_description', 'image_url', 'created_at'
-        ])->get();
-
-        return response()->json($cultures);
+    if ($request->has('category') && $request->category !== 'all') {
+        $query->where('category', $request->category);
     }
 
-    /**
-     * Menyimpan Budaya baru (Hanya Admin).
-     */
-  public function store(Request $request)
+    if ($request->has('province') && $request->province !== 'all') {
+        $query->where('province', $request->province);
+    }
+
+    $cultures = $query->get()->map(function ($culture) {
+        return [
+            'id' => $culture->id,
+            'title' => $culture->title,
+            'category' => $culture->category,
+            'province' => $culture->province,
+            'city_or_regency' => $culture->city_or_regency,
+            'short_description' => $culture->short_description,
+            'image_url' => $this->fullMediaUrl($culture->image_url),
+            'video_url' => $this->fullMediaUrl($culture->video_url),
+            'virtual_tour_url' => $this->fullMediaUrl($culture->virtual_tour_url),
+            'created_at' => $culture->created_at,
+        ];
+    });
+
+    return response()->json($cultures);
+}
+
+/**
+ * Menampilkan detail Budaya
+ */
+public function show($id)
 {
+    $culture = Culture::with(['user', 'favorites'])->findOrFail($id);
+
+    $culture->image_url = $this->fullMediaUrl($culture->image_url);
+    $culture->video_url = $this->fullMediaUrl($culture->video_url);
+    $culture->virtual_tour_url = $this->fullMediaUrl($culture->virtual_tour_url);
+
+    $culture->is_favorited = Auth::check()
+        ? $culture->favorites()->where('user_id', Auth::id())->exists()
+        : false;
+
+    return response()->json($culture);
+}
+
+/**
+ * Menambahkan Budaya baru (Admin)
+ */
+public function store(Request $request)
+{
+    if (Auth::user()->role !== 'admin') {
+        return response()->json(['message' => 'Akses ditolak'], 403);
+    }
+
     $categoryRules = 'required|string|in:' . implode(',', $this->allowedCategories);
 
     $validated = $request->validate([
@@ -60,63 +93,51 @@ class CultureController extends Controller
         'short_description' => 'required|string|max:500',
         'long_description' => 'required|string',
         'image_file' => 'required|file|mimes:jpg,jpeg,png,gif|max:2048',
-        'video_file' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
-        'virtual_tour_file' => 'nullable|file|mimes:jpg,jpeg,png,gif,mp4|max:10240',
+        'video_file' => 'nullable|file|mimes:mp4,mov,avi|max:20480', // 20 MB
+        'virtual_tour_file' => 'nullable|file|mimes:jpg,jpeg,png,gif,mp4|max:20480', // 20 MB
     ]);
 
-    // Upload file jika ada
-    if ($request->hasFile('image_file')) {
-        $validated['image_url'] = $request->file('image_file')->store('cultures/images', 'public');
-    }
+    // Upload file
+   $validated['image_file'] = $request->file('image_file')->store('cultures/images', 'public');
 
-    if ($request->hasFile('video_file')) {
-        $validated['video_url'] = $request->file('video_file')->store('cultures/videos', 'public');
-    }
+if ($request->hasFile('video_file')) {
+    $validated['video_file'] = $request->file('video_file')->store('cultures/videos', 'public');
+}
 
-    if ($request->hasFile('virtual_tour_file')) {
-        $validated['virtual_tour_url'] = $request->file('virtual_tour_file')->store('cultures/virtual', 'public');
-    }
+if ($request->hasFile('virtual_tour_file')) {
+    $validated['virtual_tour_file'] = $request->file('virtual_tour_file')->store('cultures/virtual', 'public');
+}
 
     $validated['user_id'] = Auth::id();
 
     $culture = Culture::create($validated);
 
+    // Kembalikan URL lengkap untuk frontend
+      $culture->image_url = $this->fullMediaUrl($culture->image_file);
+    $culture->video_url = $this->fullMediaUrl($culture->video_file);
+    $culture->virtual_tour_url = $this->fullMediaUrl($culture->virtual_tour_file);
+
     return response()->json([
-        'message' => 'Budaya berhasil ditambahkan.',
+        'message' => 'Budaya berhasil ditambahkan',
         'data' => $culture
     ], 201);
 }
 
-
-    /**
-     * Menampilkan detail Budaya lengkap.
-     * Dapat digunakan oleh semua User.
-     */
-    public function show($id)
-    {
-        $culture = Culture::with(['user', 'favorites'])->findOrFail($id);
-        
-        // Cek apakah user saat ini telah memfavoritkan item ini
-        $culture->is_favorited = Auth::check() 
-                                ? $culture->favorites()->where('user_id', Auth::id())->exists() 
-                                : false;
-
-        return response()->json($culture);
-    }
-
-    /**
-     * Memperbarui Budaya yang ada (Hanya Admin).
-     */
-   public function update(Request $request, $id)
+/**
+ * Update Budaya (Admin)
+ */
+public function update(Request $request, $id)
 {
     $culture = Culture::findOrFail($id);
 
+    // Cek admin
     if (Auth::user()->role !== 'admin') {
-         return response()->json(['message' => 'Akses ditolak.'], 403);
+        return response()->json(['message' => 'Akses ditolak'], 403);
     }
 
-    $categoryRules = 'required|string|in:' . implode(',', $this->allowedCategories);
+    $categoryRules = 'string|in:' . implode(',', $this->allowedCategories);
 
+    // Validasi input, semua optional (nullable)
     $validated = $request->validate([
         'title' => 'sometimes|required|string|max:255',
         'category' => 'sometimes|' . $categoryRules,
@@ -125,45 +146,63 @@ class CultureController extends Controller
         'short_description' => 'sometimes|required|string|max:500',
         'long_description' => 'sometimes|required|string',
         'image_file' => 'sometimes|file|mimes:jpg,jpeg,png,gif|max:2048',
-        'video_file' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
-        'virtual_tour_file' => 'nullable|file|mimes:jpg,jpeg,png,gif,mp4|max:10240',
+        'video_file' => 'sometimes|file|mimes:mp4,mov,avi|max:20480',
+        'virtual_tour_file' => 'sometimes|file|mimes:jpg,jpeg,png,gif,mp4|max:20480',
     ]);
 
     // Upload file jika ada
     if ($request->hasFile('image_file')) {
-        $validated['image_url'] = $request->file('image_file')->store('cultures/images', 'public');
+        $validated['image_file'] = $request->file('image_file')->store('cultures/images', 'public');
     }
 
     if ($request->hasFile('video_file')) {
-        $validated['video_url'] = $request->file('video_file')->store('cultures/videos', 'public');
+        $validated['video_file'] = $request->file('video_file')->store('cultures/videos', 'public');
     }
 
     if ($request->hasFile('virtual_tour_file')) {
-        $validated['virtual_tour_url'] = $request->file('virtual_tour_file')->store('cultures/virtual', 'public');
+        $validated['virtual_tour_file'] = $request->file('virtual_tour_file')->store('cultures/virtual', 'public');
     }
 
+    // Update database hanya field yang ada di $validated
     $culture->update($validated);
 
+    // Set URL lengkap untuk frontend
+    $culture->image_url = $this->fullMediaUrl($culture->image_file);
+    $culture->video_url = $this->fullMediaUrl($culture->video_file);
+    $culture->virtual_tour_url = $this->fullMediaUrl($culture->virtual_tour_file);
+
     return response()->json([
-        'message' => 'Budaya berhasil diperbarui.',
+        'message' => 'Budaya berhasil diperbarui',
         'data' => $culture
     ]);
 }
 
+// public function update(Request $request, $id)
+// {
+//     // Debug cepat: cek apa yang dikirim
+//     \Log::info('Update request:', $request->all());
+//     \Log::info('Files:', $request->allFiles());
 
-    /**
-     * Menghapus Budaya (Hanya Admin).
-     */
-    public function destroy($id)
-    {
-        $culture = Culture::findOrFail($id);
-        
-        // Memastikan hanya admin yang bisa melakukan destroy
-        if (Auth::user()->role !== 'admin') {
-             return response()->json(['message' => 'Akses ditolak.'], 403);
-        }
-        
-        $culture->delete();
-        return response()->json(null, 204);
+//     dd($request->all(), $request->allFiles());
+// }
+
+
+/**
+ * Delete Budaya (Admin)
+ */
+public function destroy($id)
+{
+    $culture = Culture::findOrFail($id);
+
+    if (Auth::user()->role !== 'admin') {
+        return response()->json(['message' => 'Akses ditolak'], 403);
     }
+
+    $culture->delete();
+
+    return response()->json([
+        'message' => 'Budaya berhasil dihapus'
+    ], 200);
+}
+
 }

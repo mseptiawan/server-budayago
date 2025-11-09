@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 // Auth: Login dan Register
+
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -60,7 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // CRUD Budaya
         Route::post('/cultures', [CultureController::class, 'store']);
-        Route::put('/cultures/{id}', [CultureController::class, 'update']);
+        Route::put('/cultures/{id}', [CultureController::class, 'update']); 
         Route::delete('/cultures/{id}', [CultureController::class, 'destroy']);
     });
 });
