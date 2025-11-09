@@ -15,13 +15,7 @@ class CultureController extends Controller
         'Upacara Adat', 'Arsitektur', 'Seni Tradisional'
     ];
 
-    public function __construct()
-    {
-        // Hanya user dengan role 'admin' yang bisa melakukan CRUD (Store, Update, Destroy)
-        $this->middleware('auth:sanctum')->only(['store', 'update', 'destroy']);
-        $this->middleware('can:is_admin')->only(['store', 'update', 'destroy']);
-    }
-
+  
     /**
      * Menampilkan daftar semua Budaya (List Budaya).
      * Dapat digunakan oleh semua User.

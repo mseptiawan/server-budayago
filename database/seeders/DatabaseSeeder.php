@@ -13,15 +13,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Panggil UsersTableSeeder
+        // Seed users (admin & user)
         $this->call([
             UsersTableSeeder::class,
         ]);
 
-        // Jika mau, bisa tambah seeder lain, misal CultureSeeder
-        // $this->call([
-        //     UsersTableSeeder::class,
-        //     CulturesTableSeeder::class,
-        // ]);
+        // Seed cultures (budaya)
+        $this->call([
+            CultureSeeder::class,
+        ]);
     }
 }

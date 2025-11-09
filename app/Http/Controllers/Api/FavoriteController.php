@@ -10,11 +10,6 @@ use Illuminate\Support\Facades\Auth;
 
 class FavoriteController extends Controller
 {
-    public function __construct()
-    {
-        // Semua fungsi di controller ini harus membutuhkan autentikasi
-        $this->middleware('auth:sanctum');
-    }
 
     /**
      * Menampilkan daftar semua budaya yang difavoritkan oleh user yang sedang login.

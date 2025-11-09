@@ -24,10 +24,8 @@ Route::get('/cultures/{id}', [CultureController::class, 'show']);
 // Chatbot: Chat Budaya (Asumsi ini juga dapat diakses publik atau melalui sesi non-auth)
 Route::post('/chat-budaya', [ChatbotController::class, 'chat']);
 
-// Test Route
-Route::get('/test', function () {
-    return response()->json(['ok' => true, 'message' => 'API is running']);
-});
+
+
 
 // Route::get('/chat/{query}', [GeminiController::class, 'chat']);
 // Route::get('/oauth2callback', [OAuthController::class, 'handleCallback']);
@@ -42,6 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Auth: Logout, Update Profil, dan Ganti Kata Sandi
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/profile', [AuthController::class, 'getProfile']);
     Route::put('/profile/update', [AuthController::class, 'updateProfile']); // Edit Username & Fullname
     Route::put('/profile/password', [AuthController::class, 'changePassword']); // Ganti Kata Sandi
 
